@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dexcex-config
+  namespace: dexcex-scanner
+data:
+  NATS_URL: "nats://nats:4222"
+  MIN_SPREAD_PCT: "0.5"
+  MIN_LIQUIDITY_USD: "100"
+  TOP_N_PER_CHAIN: "10"
+  MAX_RISK_SCORE: "50"
+  RISK_THRESHOLD: "50"
+  EXCHANGES: "binance,mexc,gate,bybit,kucoin,okx"
+  CEX_EXCHANGES: "binance,mexc,gate,bybit,kucoin,okx"

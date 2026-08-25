@@ -1,0 +1,8 @@
+FROM node:20-alpine
+RUN apk add --no-cache wget
+WORKDIR /app
+COPY package.json package-lock.json* ./
+RUN npm ci 2>/dev/null || npm install
+COPY services/api ./services/api
+ENV NODE_ENV=production
+CMD ["npx", "tsx", "services/api/src/index.ts"]

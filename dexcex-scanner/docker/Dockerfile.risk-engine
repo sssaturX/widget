@@ -1,0 +1,8 @@
+FROM node:20-alpine
+RUN apk add --no-cache wget
+WORKDIR /app
+COPY package.json package-lock.json* ./
+RUN npm ci 2>/dev/null || npm install
+COPY services/risk-engine ./services/risk-engine
+ENV NODE_ENV=production
+CMD ["npx", "tsx", "services/risk-engine/src/index.ts"]

@@ -1,0 +1,293 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dex-indexer
+  namespace: dexcex-scanner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dex-indexer
+  template:
+    metadata:
+      labels:
+        app: dex-indexer
+    spec:
+      containers:
+        - name: dex-indexer
+          image: dexcex-dex-indexer:latest
+          envFrom:
+            - configMapRef:
+                name: dexcex-config
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "512Mi"
+              cpu: "1000m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8088
+            initialDelaySeconds: 30
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dex-indexer
+  namespace: dexcex-scanner
+spec:
+  selector:
+    app: dex-indexer
+  ports:
+    - port: 8088
+      targetPort: 8088
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: token-registry
+  namespace: dexcex-scanner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: token-registry
+  template:
+    metadata:
+      labels:
+        app: token-registry
+    spec:
+      containers:
+        - name: token-registry
+          image: dexcex-token-registry:latest
+          envFrom:
+            - configMapRef:
+                name: dexcex-config
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8089
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: token-registry
+  namespace: dexcex-scanner
+spec:
+  selector:
+    app: token-registry
+  ports:
+    - port: 8089
+      targetPort: 8089
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: risk-engine
+  namespace: dexcex-scanner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: risk-engine
+  template:
+    metadata:
+      labels:
+        app: risk-engine
+    spec:
+      containers:
+        - name: risk-engine
+          image: dexcex-risk-engine:latest
+          envFrom:
+            - configMapRef:
+                name: dexcex-config
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8090
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: risk-engine
+  namespace: dexcex-scanner
+spec:
+  selector:
+    app: risk-engine
+  ports:
+    - port: 8090
+      targetPort: 8090
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cex-market-engine
+  namespace: dexcex-scanner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cex-market-engine
+  template:
+    metadata:
+      labels:
+        app: cex-market-engine
+    spec:
+      containers:
+        - name: cex-market-engine
+          image: dexcex-cex-engine:latest
+          envFrom:
+            - configMapRef:
+                name: dexcex-config
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "512Mi"
+              cpu: "1000m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8085
+            initialDelaySeconds: 15
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cex-market-engine
+  namespace: dexcex-scanner
+spec:
+  selector:
+    app: cex-market-engine
+  ports:
+    - port: 8085
+      targetPort: 8085
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spread-engine
+  namespace: dexcex-scanner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spread-engine
+  template:
+    metadata:
+      labels:
+        app: spread-engine
+    spec:
+      containers:
+        - name: spread-engine
+          image: dexcex-spread-engine:latest
+          env:
+            - name: NATS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: dexcex-config
+                  key: NATS_URL
+            - name: REGISTRY_URL
+              value: "http://token-registry:8089"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "512Mi"
+              cpu: "1000m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8086
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: spread-engine
+  namespace: dexcex-scanner
+spec:
+  selector:
+    app: spread-engine
+  ports:
+    - port: 8086
+      targetPort: 8086
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: signal-engine
+  namespace: dexcex-scanner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: signal-engine
+  template:
+    metadata:
+      labels:
+        app: signal-engine
+    spec:
+      containers:
+        - name: signal-engine
+          image: dexcex-signal-engine:latest
+          envFrom:
+            - configMapRef:
+                name: dexcex-config
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8087
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: signal-engine
+  namespace: dexcex-scanner
+spec:
+  selector:
+    app: signal-engine
+  ports:
+    - port: 8087
+      targetPort: 8087
+  type: ClusterIP

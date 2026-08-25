@@ -1,0 +1,26 @@
+{
+  "dashboard": {
+    "title": "DEX-CEX Scanner",
+    "panels": [
+      {
+        "title": "Services Health",
+        "type": "stat",
+        "targets": [{"expr": "up{job=~\"dexcex-.*\"}"}],
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0}
+      },
+      {
+        "title": "Signals Generated",
+        "type": "graph",
+        "targets": [{"expr": "increase(dexcex_signals_total[5m])"}],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4}
+      },
+      {
+        "title": "CEX Prices Received",
+        "type": "graph",
+        "targets": [{"expr": "rate(dexcex_cex_prices_total[1m])"}],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4}
+      }
+    ],
+    "schemaVersion": 38
+  }
+}

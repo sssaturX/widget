@@ -1,0 +1,255 @@
+# DEX-CEX Scanner — local stack
+#   docker compose up -d --build
+# Optional RPC indexer:
+#   docker compose --profile rpc up -d --build
+
+services:
+  dexcex-postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: dexcex
+      POSTGRES_PASSWORD: ${DEXCEX_POSTGRES_PASSWORD:-dexcex}
+      POSTGRES_DB: dexcex
+    ports:
+      - "5434:5432"
+    volumes:
+      - dexcex_pg_data:/var/lib/postgresql/data
+      - ./schemas/postgres:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dexcex"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  dexcex-redis:
+    image: redis:7-alpine
+    command: redis-server --maxmemory 256mb
+    ports:
+      - "6380:6379"
+    volumes:
+      - dexcex_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+
+  dexcex-nats:
+    image: nats:2-alpine
+    command: ["-js", "-sd", "/data", "-m", "8223"]
+    ports:
+      - "4223:4222"
+      - "8223:8223"
+    volumes:
+      - dexcex_nats_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8223/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  dexcex-clickhouse:
+    image: clickhouse/clickhouse-server:24-alpine
+    ports:
+      - "8124:8123"
+      - "9001:9000"
+    volumes:
+      - dexcex_ch_data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  dex-price-aggregator:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dex-price-aggregator
+    environment:
+      - NATS_URL=nats://dexcex-nats:4222
+      - AGGREGATOR_TYPE=${DEX_AGGREGATOR_TYPE:-defillama}
+      - AGGREGATOR_URL=${DEX_AGGREGATOR_URL:-}
+      - POLL_INTERVAL_MS=${DEX_AGGREGATOR_POLL_MS:-15000}
+      - HEALTH_PORT=8092
+    depends_on:
+      dexcex-nats:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8092/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  token-registry:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.token-registry
+    environment:
+      - NATS_URL=nats://dexcex-nats:4222
+      - HEALTH_PORT=8089
+    depends_on:
+      dexcex-nats:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8089/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  cex-market-engine:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.cex-engine
+    environment:
+      - NATS_URL=nats://dexcex-nats:4222
+      - EXCHANGES=${EXCHANGES:-binance,mexc,gate,bybit,kucoin,okx}
+      - HEALTH_PORT=8085
+    depends_on:
+      dexcex-nats:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8085/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  spread-engine:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.spread-engine
+    environment:
+      - NATS_URL=nats://dexcex-nats:4222
+      - REGISTRY_URL=http://token-registry:8089
+      - CEX_EXCHANGES=${CEX_EXCHANGES:-binance,mexc,gate,bybit,kucoin,okx}
+      - RISK_THRESHOLD=${RISK_THRESHOLD:-50}
+      - SLIPPAGE_TRADE_USD=${SLIPPAGE_TRADE_USD:-1000}
+      - HEALTH_PORT=8086
+    depends_on:
+      dexcex-nats:
+        condition: service_healthy
+      token-registry:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8086/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  signal-engine:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.signal-engine
+    environment:
+      - NATS_URL=nats://dexcex-nats:4222
+      - MIN_SPREAD_PCT=${MIN_SPREAD_PCT:-0.5}
+      - MIN_LIQUIDITY_USD=${MIN_LIQUIDITY_USD:-100}
+      - TOP_N_PER_CHAIN=${TOP_N_PER_CHAIN:-10}
+      - MAX_RISK_SCORE=${MAX_RISK_SCORE:-50}
+      - HEALTH_PORT=8087
+    depends_on:
+      dexcex-nats:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8087/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  dexcex-api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    environment:
+      - PORT=3002
+      - NATS_URL=nats://dexcex-nats:4222
+      - CORS_ORIGINS=${CORS_ORIGINS:-}
+    ports:
+      - "3002:3002"
+    depends_on:
+      dexcex-nats:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3002/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  rpc-gateway:
+    profiles: ["rpc"]
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.rpc-gateway
+    environment:
+      - PORT=8545
+      - HEALTH_PORT=8546
+      - RPC_ETHEREUM=${RPC_ETHEREUM:-}
+      - RPC_BSC=${RPC_BSC:-}
+      - RPC_ARBITRUM=${RPC_ARBITRUM:-}
+      - RPC_POLYGON=${RPC_POLYGON:-}
+      - RPC_BASE=${RPC_BASE:-}
+      - RPC_OPTIMISM=${RPC_OPTIMISM:-}
+      - RPC_AVALANCHE=${RPC_AVALANCHE:-}
+    ports:
+      - "8545:8545"
+      - "8546:8546"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8546/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  dex-indexer:
+    profiles: ["rpc"]
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dex-indexer
+    environment:
+      - NATS_URL=nats://dexcex-nats:4222
+      - RPC_URL=http://rpc-gateway:8545
+      - HEALTH_PORT=8088
+    depends_on:
+      dexcex-nats:
+        condition: service_healthy
+      rpc-gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8088/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  risk-engine:
+    profiles: ["rpc"]
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.risk-engine
+    environment:
+      - NATS_URL=nats://dexcex-nats:4222
+      - RPC_URL=http://rpc-gateway:8545
+      - HEALTH_PORT=8090
+      - RISK_THRESHOLD=${RISK_THRESHOLD:-50}
+    depends_on:
+      dexcex-nats:
+        condition: service_healthy
+      rpc-gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8090/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  dexcex_pg_data:
+  dexcex_redis_data:
+  dexcex_nats_data:
+  dexcex_ch_data:

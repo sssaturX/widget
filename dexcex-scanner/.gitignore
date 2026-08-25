@@ -1,0 +1,16 @@
+node_modules/
+dist/
+*.log
+logs/
+.env
+.env.local
+.env.*.local
+!.env.example
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+coverage/
+.cache/

@@ -1,0 +1,27 @@
+# DEX-CEX Scanner — Prometheus alerting rules
+groups:
+  - name: dexcex
+    rules:
+      - alert: DexCexServiceDown
+        expr: up{job=~"dexcex-.*"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "DEX-CEX service {{ $labels.job }} is down"
+
+      - alert: DexCexHighLatency
+        expr: dexcex_signal_latency_ms > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "DEX-CEX signal latency > 1s"
+
+      - alert: DexCexNatsDisconnected
+        expr: dexcex_nats_connected == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "DEX-CEX lost NATS connection"

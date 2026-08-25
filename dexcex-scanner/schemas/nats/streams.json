@@ -1,0 +1,23 @@
+{
+  "streams": [
+    {
+      "name": "DEXCEX",
+      "subjects": [
+        "tokens.new",
+        "dex.events",
+        "dex.liquidity",
+        "cex.prices",
+        "cex.orderbooks",
+        "risk.results",
+        "spreads.calculated",
+        "signals.generated"
+      ],
+      "retention": "limits",
+      "max_msgs": 10000000,
+      "max_bytes": 1073741824,
+      "max_age": 604800000000000,
+      "storage": "file",
+      "replicas": 1
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "name": "dexcex-scanner",
+  "version": "0.1.0",
+  "private": false,
+  "license": "MIT",
+  "description": "Open-source DEX vs CEX arbitrage scanner: aggregator/RPC DEX prices, six CEX websockets, spread signals over NATS. No trade execution.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sssaturX/dexcex-scanner.git"
+  },
+  "bugs": {
+    "url": "https://github.com/sssaturX/dexcex-scanner/issues"
+  },
+  "homepage": "https://github.com/sssaturX/dexcex-scanner#readme",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "concurrently -k \"npm:dev:rpc\" \"npm:dev:dex\" \"npm:dev:aggregator\" \"npm:dev:registry\" \"npm:dev:risk\" \"npm:dev:cex\" \"npm:dev:spread\" \"npm:dev:signal\" \"npm:dev:api\"",
+    "dev:standalone": "concurrently -k \"npm:dev:aggregator\" \"npm:dev:cex\" \"npm:dev:spread\" \"npm:dev:signal\" \"npm:dev:api\"",
+    "dev:rpc": "tsx services/rpc-gateway/src/index.ts",
+    "dev:dex": "tsx services/dex-indexer/src/index.ts",
+    "dev:aggregator": "tsx services/dex-price-aggregator/src/index.ts",
+    "dev:registry": "tsx services/token-registry/src/index.ts",
+    "dev:risk": "tsx services/risk-engine/src/index.ts",
+    "dev:cex": "tsx services/cex-market-engine/src/index.ts",
+    "dev:spread": "tsx services/spread-engine/src/index.ts",
+    "dev:signal": "tsx services/signal-engine/src/index.ts",
+    "dev:api": "tsx services/api/src/index.ts",
+    "build": "tsc -b",
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "psql $DATABASE_URL -f schemas/postgres/001_init.sql"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.0",
+    "concurrently": "^8.2.2",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.0",
+    "nats": "^2.28.0",
+    "pg": "^8.11.0",
+    "pino": "^8.17.0",
+    "pino-pretty": "^10.3.0",
+    "redis": "^4.6.0",
+    "undici": "^6.0.0"
+  }
+}
